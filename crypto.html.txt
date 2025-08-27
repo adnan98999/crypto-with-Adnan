@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Crypto Live Signals</title>
+<script src="https://s3.tradingview.com/tv.js"></script>
+</head>
+<body>
+<div id="tv_chart" style="width:100%; height:100vh;"></div>
+
+<script>
+// Top 20 coins
+var top20 = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","ADAUSDT","DOGEUSDT","MATICUSDT","LTCUSDT","DOTUSDT","AVAXUSDT","LINKUSDT","XLMUSDT","TRXUSDT","VETUSDT","ATOMUSDT","ALGOUSDT","SHIBUSDT","FTMUSDT","HBARUSDT"];
+
+// EMA Calculation
+function calculateEMA(prices, period){
+    let k = 2/(period+1);
+    let ema = [prices[0]];
+    for(let i=1;i<prices.length;i++){
+        ema.push(prices[i]*k + ema[i-1]*(1-k));
+    }
+    return ema;
+}
+
+// RSI Calculation
+function calculateRSI(prices, period){
+    let gains=0, losses=0;
+    for(let i=1;i<=period;i++){
+        let diff = prices[i]-prices[i-1];
+        if(diff>0) gains+=diff;
+        else losses-=diff;
+    }
+    let avgGain = gains/period;
+    let avgLoss = losses/period;
+    let RS = avgGain/avgLoss;
+    return 100 - (100/(1+RS));
+}
+
+// Fetch historical prices from Binance
+async function fetchCoinData(symbol){
+    try{
+        let response = await fetch("https://api.binance.com/api/v3/klines?symbol="+symbol+"&interval=5m&limit=50");
+        let data = await response.json();
+        let prices = [], volumes = [];
+        for(let i=0;i<data.length;i++){
+            prices.push(parseFloat(data[i][4])); // Close
+            volumes.push(parseFloat(data[i][5])); // Volume
+        }
+        let shortEMA = calculateEMA(prices,9).slice(-1)[0];
+        let longEMA = calculateEMA(prices,21).slice(-1)[0];
+        let RSI = calculateRSI(prices,14);
+        let lastPrice = prices.slice(-1)[0];
+        let lastVolume = volumes.slice(-1)[0];
+
+        // Signal Logic
+        if(shortEMA>longEMA && RSI<30 && lastVolume>0){
+            alert("BUY "+symbol+" @ "+lastPrice);
+        }
+        if(shortEMA<longEMA && RSI>70 && lastVolume>0){
+            alert("SELL "+symbol+" @ "+lastPrice);
+        }
+    } catch(err){
+        console.log(symbol+" fetch error:", err);
+    }
+}
+
+// Fetch signals for all top 20 coins
+top20.forEach(symbol => fetchCoinData(symbol));
+
+// TradingView multi-chart
+new TradingView.widget({
+  container_id: "tv_chart",
+  width: "100%",
+  height: "100%",
+  symbol: "BINANCE:BTCUSDT,BINANCE:ETHUSDT,BINANCE:SOLUSDT,BINANCE:BNBUSDT,BINANCE:XRPUSDT,BINANCE:ADAUSDT,BINANCE:DOGEUSDT,BINANCE:MATICUSDT,BINANCE:LTCUSDT,BINANCE:DOTUSDT,BINANCE:AVAXUSDT,BINANCE:LINKUSDT,BINANCE:XLMUSDT,BINANCE:TRXUSDT,BINANCE:VETUSDT,BINANCE:ATOMUSDT,BINANCE:ALGOUSDT,BINANCE:SHIBUSDT,BINANCE:FTMUSDT,BINANCE:HBARUSDT",
+  interval: "5",
+  timezone: "Etc/UTC",
+  theme: "dark",
+  style: "1",
+  locale: "en",
+  studies: ["EMAExp@tv-basicstudies","RSI@tv-basicstudies","Volume@tv-basicstudies"]
+});
+</script>
+</body>
+</html>
